@@ -5,7 +5,9 @@ import ezdxf
 import re
 import datetime
 import subprocess
-
+import matplotlib.pyplot as plt
+from ezdxf.addons.drawing import RenderContext, Frontend
+from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 def convert_dwg_to_dxf(folder_path, output_folder):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -77,7 +79,7 @@ def modify_text_entities(entities):
             if match_rev:
                 current_rev = int(match_rev.group(1))
                 new_rev = current_rev + 1
-                revised_text = re.sub(r'(?P<rev>Rev\s*)\d+', r'\g<rev>' + str(new_rev)+' - '+"APPROVED FOR CONSTRUCTION", text)
+                revised_text = re.sub(r'(?P<rev>Rev\s*)\d+', r'\g<rev>' + str(new_rev)+' - '+"AS BUILT", text)
                 entity.dxf.text = revised_text
             # Convert dates to today's date in the same format
             if re.search(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}-\d{4}', text):
@@ -96,7 +98,7 @@ def modify_text_entities(entities):
             if match_rev:
                 current_rev = int(match_rev.group(1))
                 new_rev = current_rev + 1
-                revised_text = re.sub(r'(?P<rev>Rev\s*)\d+', r'\g<rev>' + str(new_rev)+' - '+"APPROVED FOR CONSTRUCTION", text)
+                revised_text = re.sub(r'(?P<rev>Rev\s*)\d+', r'\g<rev>' + str(new_rev)+' - '+"AS BUILT", text)
                 entity.text = revised_text
             # Convert dates to today's date in the same format
             if re.search(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}-\d{4}', text):
@@ -112,6 +114,128 @@ def modify_text_entities(entities):
 
         print("Found text entity:", entity.dxf.text if entity.dxftype() == 'TEXT' else entity.text)  # Print the text content
 
+def print_drawings(dxf_files, pdf_folder):
+    if not os.path.exists(pdf_folder):
+        os.makedirs(pdf_folder)
+
+    for file in dxf_files:
+        doc = ezdxf.readfile(file)
+
+        # Calculate the extents of the drawing
+        min_x = min_y = float('inf')
+        max_x = max_y = float('-inf')
+
+        # Iterate over model space
+        for entity in doc.modelspace():
+            if entity.dxftype() == 'LINE':
+                min_x = min(min_x, entity.dxf.start.x, entity.dxf.end.x)
+                min_y = min(min_y, entity.dxf.start.y, entity.dxf.end.y)
+                max_x = max(max_x, entity.dxf.start.x, entity.dxf.end.x)
+                max_y = max(max_y, entity.dxf.start.y, entity.dxf.end.y)
+            elif entity.dxftype() == 'LWPOLYLINE':
+                for vertex in entity.vertices():
+                    min_x = min(min_x, vertex[0])
+                    min_y = min(min_y, vertex[1])
+                    max_x = max(max_x, vertex[0])
+                    max_y = max(max_y, vertex[1])
+
+        # Iterate over paper space layouts
+        for layout in doc.layouts:
+            for entity in layout:
+                if entity.dxftype() == 'LINE':
+                    min_x = min(min_x, entity.dxf.start.x, entity.dxf.end.x)
+                    min_y = min(min_y, entity.dxf.start.y, entity.dxf.end.y)
+                    max_x = max(max_x, entity.dxf.start.x, entity.dxf.end.x)
+                    max_y = max(max_y, entity.dxf.start.y, entity.dxf.end.y)
+                elif entity.dxftype() == 'LWPOLYLINE':
+                    for vertex in entity.vertices():
+                        min_x = min(min_x, vertex[0])
+                        min_y = min(min_y, vertex[1])
+                        max_x = max(max_x, vertex[0])
+                        max_y = max(max_y, vertex[1])
+
+        # Calculate the width and height of the drawing
+        width = max_x - min_x
+        height = max_y - min_y
+
+        # Add a slight margin of 0.25 inches
+        margin = 0.25
+        min_x -= margin
+        min_y -= margin
+        max_x += margin
+        max_y += margin
+
+        # Ensure the calculated dimensions are positive and finite
+        if width <= 0 or height <= 0:
+            continue
+
+        # ANSI-B paper size in inches (11x17 inches)
+        ansi_b_width_inches = 17
+        ansi_b_height_inches = 11
+
+        # Calculate the scale factor to fit the drawing onto the ANSI-B page
+        scale_factor = min(ansi_b_width_inches / width, ansi_b_height_inches / height)
+
+        # Calculate the new width and height of the drawing
+        new_width = width * scale_factor
+        new_height = height * scale_factor
+
+        # Create a PDF file
+        out_file = os.path.join(pdf_folder, os.path.splitext(os.path.basename(file))[0] + '.pdf')
+
+        # Create a matplotlib figure with ANSI-B paper size
+        fig, ax = plt.subplots(figsize=(ansi_b_width_inches, ansi_b_height_inches))
+        fig.subplots_adjust(left=0, right=1, top=1, bottom=0)  # Set tight layout
+        ax.set_xlim(min_x, min_x + new_width)
+        ax.set_ylim(min_y, min_y + new_height)
+        backend = MatplotlibBackend(ax)
+
+        ctx = RenderContext(doc)
+        out = MatplotlibBackend(ax)
+        frontend = Frontend(ctx, out)
+
+        # Draw model space
+        frontend.draw_layout(doc.modelspace(), finalize=True)
+
+        # Draw paper space layouts
+        for layout in doc.layouts:
+            if layout.name.lower() != 'model':
+                frontend.draw_layout(layout, finalize=True)
+
+        # Save the plot as PDF
+        fig.savefig(out_file, format='pdf', dpi=300)
+        plt.close(fig)
+
+# def print_drawings(dxf_files, pdf_folder):
+#     if not os.path.exists(pdf_folder):
+#         os.makedirs(pdf_folder)
+#
+#     for file in dxf_files:
+#         doc = ezdxf.readfile(file)
+#
+#         # Create a PDF file
+#         out_file = os.path.join(pdf_folder, os.path.splitext(os.path.basename(file))[0] + '.pdf')
+#
+#         # Create a matplotlib figure
+#         fig, ax = plt.subplots(figsize=(17, 11))  # ANSI B paper size is 11x17 inches
+#         fig.subplots_adjust(left=0.25, right=0.75, top=0.75, bottom=0.25)  # Adjust margins
+#         backend = MatplotlibBackend(ax)
+#
+#         ctx = RenderContext(doc)
+#         out = MatplotlibBackend(ax)
+#         frontend = Frontend(ctx, out)
+#
+#         # Draw model space
+#         frontend.draw_layout(doc.modelspace(), finalize=True)
+#
+#         # Draw paper space layouts
+#         for layout in doc.layouts:
+#             if layout.name.lower() != 'model':
+#                 frontend.draw_layout(layout, finalize=True)
+#
+#         # Save the plot as PDF
+#         fig.savefig(out_file, format='pdf', dpi=300)
+#         plt.close(fig)
 
 # Function to read and modify DXF files
 def modify_dxf_files(dxf_files, output_folder):
@@ -166,10 +290,15 @@ def modify_dxf_files(dxf_files, output_folder):
         doc.saveas(output_file)
 
 
-# Main code
-folder_path = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\23034 - Project Gold Bar\02 Shop Drawing Package\_Working\23034 Shop Drawing Package Rev3 AFC\DWG"
-dxf_files = find_dxf_files(folder_path)
-output_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\23034 - Project Gold Bar\02 Shop Drawing Package\_Working\23034 Shop Drawing Package Rev3 AFC\DWG2"
-convert_dwg_to_dxf(folder_path, output_folder)
-modify_dxf_files(dxf_files, output_folder)
+folder_path = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\22514 Arcatat WWTP\02 Shop Drawing Package\_Working\22514 Shop Drawing Package Rev2-AFC\dwg"
+output_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\22514 Arcatat WWTP\02 Shop Drawing Package\_Working\22514 Shop Drawing Package Rev2-AFC\dwg2"
+pdf_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\22514 Arcatat WWTP\02 Shop Drawing Package\_Working\22514 Shop Drawing Package Rev2-AFC\pdf2"
+# Convert DWG to DXF
+convert_dwg_to_dxf(folder_path, folder_path)
 
+# Find DXF files in the output folder
+dxf_files = find_dxf_files(folder_path)
+
+# Modify DXF files
+modify_dxf_files(dxf_files, output_folder)
+print_drawings(dxf_files, pdf_folder)
