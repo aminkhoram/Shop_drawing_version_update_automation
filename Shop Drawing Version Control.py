@@ -19,7 +19,7 @@ def convert_dwg_to_dxf(folder_path, output_folder):
             INPUT_FOLDER = folder_path  # Use the provided folder_path
             OUTPUT_FOLDER = output_folder  # Use the provided output_folder
             OUTVER = "ACAD2018"
-            OUTFORMAT = "DXF"
+            OUTFORMAT = "DXF" 
             RECURSIVE = "0"
             AUDIT = "1"
             INPUTFILTER = "*.DWG"
