@@ -210,9 +210,9 @@ class DXFProcessor:
 
 if __name__ == "__main__":
     teigha_path = r"C:\Program Files\ODA\ODAFileConverter 25.2.0\ODAFileConverter.exe"
-    folder_path = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\22514 Arcatat WWTP\02 Shop Drawing Package\_Working\22514 Shop Drawing Package Rev2-AFC\dwg"
-    output_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\22514 Arcatat WWTP\02 Shop Drawing Package\_Working\22514 Shop Drawing Package Rev2-AFC\dwg2"
-    pdf_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\22514 Arcatat WWTP\02 Shop Drawing Package\_Working\22514 Shop Drawing Package Rev2-AFC\pdf2"
+    folder_path = r""
+    output_folder = r""
+    pdf_folder = r""
 
     processor = DXFProcessor(teigha_path)
 
