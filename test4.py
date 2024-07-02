@@ -188,8 +188,8 @@ def modify_dxf_files(dxf_files, output_folder):
         doc.saveas(output_file)
 
 
-folder_path = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\22514 Arcatat WWTP\02 Shop Drawing Package\_Working\22514 Shop Drawing Package Rev2-AFC\dwg"
-output_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\22514 Arcatat WWTP\02 Shop Drawing Package\_Working\22514 Shop Drawing Package Rev2-AFC\dwg2"
+folder_path = r""
+output_folder = r""
 
 # Convert DWG to DXF
 convert_dwg_to_dxf(folder_path, folder_path)
