@@ -267,9 +267,9 @@ def modify_dxf_files(dxf_files, x1, y1, x2, y2, x3, y3, rev_no, rev, rev_date, v
 
 
 # Save the modified DXF file in the output folder
-input_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\24257 - MSFT YQB06 colo 2\02 Shop Drawing Package\_Working\24257 Shop Drawing Package_Rev2-test\dwg"
-output_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\24257 - MSFT YQB06 colo 2\02 Shop Drawing Package\_Working\24257 Shop Drawing Package_Rev2-test\dwg2"
-pdf_output = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\24257 - MSFT YQB06 colo 2\02 Shop Drawing Package\_Working\24257 Shop Drawing Package_Rev2-test\pdf2"
+input_folder = r""
+output_folder = r""
+pdf_output = r""
 x1, y1, x2, y2, x3, y3, rev_no, rev, rev_date, version_control = get_user_input()
 # Convert DWG to DXF
 convert_dwg_to_dxf(input_folder, output_folder)
