@@ -4,19 +4,39 @@ import os
 import ezdxf
 import re
 import datetime
+import shutil
 import subprocess
 import matplotlib.pyplot as plt
 from ezdxf.addons.drawing import RenderContext, Frontend
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
-def convert_dwg_to_dxf(folder_path, output_folder):
+
+def get_user_input():
+    x1 = float(input("Enter x1 for the first comment: "))
+    y1 = float(input("Enter y1 for the first comment: "))
+    x2 = float(input("Enter x2 for the second comment (default is x1): ")) or x1
+    x3 = float(input("Enter x3 for the third comment (default is x1): ")) or x1
+    y2 = y3 = y1
+    rev_no = int(input("Enter revision number: "))
+    rev_date = datetime.datetime.today().strftime('%b-%d-%Y')
+    version_control = int(input("Choose version change: 1 (fca_to_afc), 2 (afc_to_asbuilt), 3 (fca_to_asbuilt): "))
+    
+    rev_map = {1: "APPROVED FOR CONSTRUCTION", 2: "AS BUILT", 3: "AS BUILT"}
+    rev = rev_map.get(version_control, "UNKNOWN")
+    
+    return x1, y1, x2, y2, x3, y3, rev_no, rev, rev_date, version_control
+
+def convert_dwg_to_dxf(input_folder, output_folder):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.dwg'):
+    for filename in os.listdir(input_folder):
+        if filename.endswith('.dxf'):
+            shutil.copy(os.path.join(input_folder, filename), os.path.join(output_folder, filename))
+        
+        elif filename.endswith('.dwg'):
             # Load DWG file
             TEIGHA_PATH = "C:\Program Files\ODA\ODAFileConverter 25.2.0\ODAFileConverter.exe"
-            INPUT_FOLDER = folder_path  # Use the provided folder_path
+            INPUT_FOLDER = input_folder  # Use the provided input_folder
             OUTPUT_FOLDER = output_folder  # Use the provided output_folder
             OUTVER = "ACAD2018"
             OUTFORMAT = "DXF" 
@@ -30,107 +50,83 @@ def convert_dwg_to_dxf(folder_path, output_folder):
             # Run
             subprocess.run(cmd, shell=True)
 
-# Function to detect DXF files in a specific path
-def find_dxf_files(folder_path):
-    dxf_files = []
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.dxf'):
-            dxf_files.append(os.path.join(folder_path, filename))
-    return dxf_files
+def find_dxf_files(output_folder):
+    return [os.path.join(output_folder, f) for f in os.listdir(output_folder) if f.endswith('.dxf') and "DM-01" not in f]
 
-
-# Function to find and print text entities (both single-line text and MTEXT) outside of blocks
-def print_text_entities_outside_blocks(doc):
-    outside_block_entities = []
-    for entity in doc.entities:
-        if entity.dxftype() in ['TEXT', 'MTEXT']:
-            outside_block_entities.append(entity)
-    print("Text entities outside of blocks:")
-    for entity in outside_block_entities:
-        if entity.dxftype() == 'TEXT':
-            text = entity.dxf.text
-        elif entity.dxftype() == 'MTEXT':
-            text = entity.plain_text()
-        print("Found text entity:", text)
-#
-#
-# # Function to print all found text entities (both single-line text and MTEXT)
-def print_text_entities(entities):
+def modify_text_entities(entities, version_control):
+    today_date = datetime.datetime.today().strftime('%b-%d-%Y')
+    for file in dxf_files:
+        file_name = os.path.basename(file)
+        doc = ezdxf.readfile(file)
+        model_space_layout = doc.modelspace()
+        paper_space_layout = doc.paperspace()
     for entity in entities:
-        if entity.dxftype() == 'TEXT':
+        if entity.dxftype() in ('TEXT', 'MTEXT') and hasattr(entity, 'dxf'):
             text = entity.dxf.text
-        elif entity.dxftype() == 'MTEXT':
-            text = entity.plain_text()
-        print("Found text entity:", text)
-
-def is_no_circle_around(text_entity, entities, radius_in_inches=0.1):
-    """Check if there is no circle within the specified radius of the text entity."""
-    radius = radius_in_inches * 25.4  # Convert inches to millimeters
-    x_text, y_text = text_entity.dxf.insert.x, text_entity.dxf.insert.y
-    for entity in entities:
-        if entity.dxftype() == 'CIRCLE':
-            x_circle, y_circle = entity.dxf.center.x, entity.dxf.center.y
-            distance = ((x_text - x_circle) ** 2 + (y_text - y_circle) ** 2) ** 0.5
-            if distance <= radius:  # Check if the text is within the circle
-                return False
-    return True
-
-# Function to modify text entities in DXF files
-def modify_text_entities(entities):
-    today_date = datetime.datetime.today().strftime('%b-%d-%Y')  # Get today's date
-    for entity in entities:
-        if entity.dxftype() == 'TEXT':
-            text = entity.dxf.text
-
-            # Increment revision number if 'Rev' is found
-            if text.isdigit() and is_no_circle_around(entity, entities):
-                current_number = int(entity.dxf.text)
-                if current_number < 10:
-                    entity.dxf.text = re.sub(r'\b(\d+)\b', lambda x: str(int(x.group(1)) + 1), entity.dxf.text)
             match_rev = re.search(r'Rev(\d+)', text)
+
             if match_rev:
                 current_rev = int(match_rev.group(1))
                 new_rev = current_rev + 1
-                revised_text = re.sub(r'(?P<rev>Rev\s*)\d+', r'\g<rev>' + str(new_rev)+' - '+"AS BUILT", text)
-                revised_text = re.sub(r'(AS BUILT).*', r'AS BUILT', revised_text)
-                entity.dxf.text = revised_text
-            # Convert dates to today's date in the same format
-            if re.search(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}-\d{4}', text):
-                entity.dxf.text = re.sub(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}-\d{4}', today_date, text)
-            # Update stamp text only if "FOR CUSTOMER" is present
-            if "FOR CUSTOMER" in text:
-                entity.dxf.text = text.replace("FOR CUSTOMER", "APPROVED FOR")
-            if "APPROVAL" in text:
-                entity.dxf.text = text.replace("APPROVAL", "CONSTRUCTION")
-            elif "APPROVED FOR" in text and "CONSTRUCTION" in text:
-                entity.dxf.text = "AS BUILT"
-        elif entity.dxftype() == 'MTEXT':
-            text = entity.plain_text()
-            # Increment revision number if 'Rev' is found
-            match_rev = re.search(r'Rev(\d+)', text)
-            if match_rev:
-                current_rev = int(match_rev.group(1))
-                new_rev = current_rev + 1
-                revised_text = re.sub(r'(?P<rev>Rev\s*)\d+', r'\g<rev>' + str(new_rev)+' - '+"AS BUILT", text)
-                revised_text = re.sub(r'(AS BUILT).*', r'AS BUILT', revised_text)
-                entity.text = revised_text
-            # Convert dates to today's date in the same format
-            if re.search(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}-\d{4}', text):
-                entity.text = re.sub(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}-\d{4}', today_date, text)
-            # Update stamp text only if "FOR CUSTOMER" is present
-            if "FOR CUSTOMER" in text:
-                text = text.replace("FOR CUSTOMER", "APPROVED FOR")
-            if "APPROVAL" in text:
-                text = text.replace("APPROVAL", "CONSTRUCTION")
-            elif "APPROVED FOR" in text and "CONSTRUCTION" in text:
-                text = "AS BUILT"
-            entity.text = text
+                rev_text = f"Rev {new_rev} - {'AS BUILT' if version_control > 1 else 'AFC'}"
+                entity.dxf.text = re.sub(r'Rev\s*\d+', rev_text, text)
 
-        print("Found text entity:", entity.dxf.text if entity.dxftype() == 'TEXT' else entity.text)  # Print the text content
+            if text.isdigit():
+                    current_number = int(text)
+                    
+                    # Only increment if the current number is less than 10
+                    if 1 < current_number < 10:
+                        # Check for number in paper space
+                        if any(entity.dxf.text.strip() == text for entity in paper_space_layout if entity.dxftype() == 'TEXT') and "list" not in file_name.lower():
+                            # Increment the number in paper space
+                            entity.dxf.text = re.sub(r'\b(\d+)\b', lambda x: str(int(x.group(1)) + 1), text)
+                    else:
+                        pass 
+                    
+            
+            
 
-def print_drawings(dxf_files, pdf_folder):
-    if not os.path.exists(pdf_folder):
-        os.makedirs(pdf_folder)
+            if entity in model_space_layout:
+                # Update dates in model space only
+                if re.search(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}-\d{4}', text):
+                    entity.dxf.text = re.sub(r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}-\d{4}', today_date, text)
+
+            if "FOR CUSTOMER" in text and "APPROVAL" in text and version_control==3:
+                entity.dxf.text = text.replace("FOR CUSTOMER", "AS BUILT").replace("APPROVAL", "").strip()
+            elif "FOR CUSTOMER" in text and "APPROVAL" in text and version_control==1:
+                entity.dxf.text = text.replace("FOR CUSTOMER", "APPROVED FOR").replace("APPROVAL", "CONTRUCTION").strip()
+            elif "APPROVED FOR" in text and "CONSTRUCTION" in text and version_control==2:
+                entity.dxf.text = text.replace("APPROVED FOR", "AS BUILT").replace("CONSTRUCTION", "").strip()
+
+def list_incrementer(output_folder):
+    # Iterate over all files in the output folder
+    for filename in os.listdir(output_folder):
+        # Check if the filename contains "list" (case-insensitive) and is a DXF file
+        if 'list' in filename.lower() and filename.endswith('.dxf'):
+            # Open the DXF file
+            filepath = os.path.join(output_folder, filename)
+            doc = ezdxf.readfile(filepath)
+            
+            # Iterate over all entities in the document (model and paper spaces)
+            for entity in doc.entities:
+                if entity.dxftype() in ('TEXT', 'MTEXT') and hasattr(entity, 'dxf'):
+                    text = entity.dxf.text
+                    if text.isdigit():
+                        current_number = int(text)
+                        if current_number<10:
+                            # Increment standalone numbers in the text
+                            updated_text = re.sub(r'\b(\d+)\b', lambda x: str(int(x.group(1)) + 1), text)
+                            entity.dxf.text = updated_text
+            
+            # Save the updated DXF file
+            doc.saveas(filepath)
+
+
+
+
+def print_drawings(dxf_files, pdf_output):
+    if not os.path.exists(pdf_output):
+        os.makedirs(pdf_output)
 
     for file in dxf_files:
         doc = ezdxf.readfile(file)
@@ -195,7 +191,7 @@ def print_drawings(dxf_files, pdf_folder):
         new_height = height * scale_factor
 
         # Create a PDF file
-        out_file = os.path.join(pdf_folder, os.path.splitext(os.path.basename(file))[0] + '.pdf')
+        out_file = os.path.join(pdf_output, os.path.splitext(os.path.basename(file))[0] + '.pdf')
 
         # Create a matplotlib figure with ANSI-B paper size
         fig, ax = plt.subplots(figsize=(ansi_b_width_inches, ansi_b_height_inches))
@@ -220,52 +216,46 @@ def print_drawings(dxf_files, pdf_folder):
         fig.savefig(out_file, format='pdf', dpi=300)
         plt.close(fig)
 
-def modify_dxf_files(dxf_files, output_folder):
+def modify_dxf_files(dxf_files, x1, y1, x2, y2, x3, y3, rev_no, rev, rev_date, version_control, output_folder):
+    
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
     for file in dxf_files:
         doc = ezdxf.readfile(file)
         # Print text entities outside of blocks
-        print_text_entities_outside_blocks(doc)
+        # print_text_entities_outside_blocks(doc)
 
         # Print and modify text entities in model space
         model_space_layout = doc.modelspace()
         model_space_text_entities = [entity for entity in model_space_layout if entity.dxftype() in ['TEXT', 'MTEXT']]
-        print_text_entities(model_space_text_entities)
-        modify_text_entities(model_space_text_entities)
-
+        # print_text_entities(model_space_text_entities)
+        modify_text_entities(model_space_text_entities, version_control)
+        # Print and modify text entities in paper space layouts
         # Print and modify text entities in paper space layouts
         for layout in doc.layouts:
             if layout.name.lower() != 'model':
                 paper_space_text_entities = [entity for entity in layout if entity.dxftype() in ['TEXT', 'MTEXT']]
-                print_text_entities(paper_space_text_entities)
-                modify_text_entities(paper_space_text_entities)
-                # Add comment to a specific part of the drawing in paperspace
-                # Specify comment text and location
-                spaces = " " * 11  # 10 spaces
-                spacesdate = " " * 72  # 63 spaces
-                comment_text = f"3{spaces}AS BUILT{spacesdate}Aug-06-2024"
-                bottom_left_coordinate = (0, 0)
-                offset_x = 6.66  # Offset from the left edge
-                offset_y = 1.61  # Offset from the bottom edg
-                coordinate = (bottom_left_coordinate[0] + offset_x, bottom_left_coordinate[1] + offset_y)
-                # Create a new MTEXT entity
-                mtext_entity = layout.add_mtext(comment_text, dxfattribs={'style': 'Arial'})
+                # print_text_entities(paper_space_text_entities)
+                modify_text_entities(paper_space_text_entities, version_control)
 
-                # Set the insertion point of the MTEXT entity
-                mtext_entity.dxf.insert = coordinate
-
-                # Set the text height through the style of the MTEXT entity
-                mtext_entity.dxf.char_height = 0.08
-
-                # Set the color of the MTEXT entity to black
-                mtext_entity.dxf.color = 0
+                # Add each piece of text to the layout using the provided coordinates
+                l1 = layout.add_mtext(rev_no, dxfattribs={'style': 'Arial'})
+                l1.dxf.insert = (x1, y1)
+                l1.dxf.char_height = 0.08
+                l1.dxf.color = 0
+                
+                l2 = layout.add_mtext(rev, dxfattribs={'style': 'Arial'})
+                l2.dxf.insert = (x2, y2)
+                l2.dxf.char_height = 0.08
+                l2.dxf.color = 0
+                
+                l3 = layout.add_mtext(rev_date, dxfattribs={'style': 'Arial'})
+                l3.dxf.insert = (x3, y3)
+                l3.dxf.char_height = 0.08
+                l3.dxf.color = 0
 
                 # Set the paperspace background to ANSI B (ANSIB)
             layout.dxf.paper_size = (11, 17)  # ANSI B size is 11x17 inches
-
-
-
 
         # Save the modified DXF file in the output folder
         filename = os.path.basename(file)
@@ -273,15 +263,21 @@ def modify_dxf_files(dxf_files, output_folder):
         doc.saveas(output_file)
 
 
-folder_path = r""
-output_folder = r""
-pdf_folder = r""
+
+
+
+# Save the modified DXF file in the output folder
+input_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\24257 - MSFT YQB06 colo 2\02 Shop Drawing Package\_Working\24257 Shop Drawing Package_Rev2-test\dwg"
+output_folder = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\24257 - MSFT YQB06 colo 2\02 Shop Drawing Package\_Working\24257 Shop Drawing Package_Rev2-test\dwg2"
+pdf_output = r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\24257 - MSFT YQB06 colo 2\02 Shop Drawing Package\_Working\24257 Shop Drawing Package_Rev2-test\pdf2"
+x1, y1, x2, y2, x3, y3, rev_no, rev, rev_date, version_control = get_user_input()
 # Convert DWG to DXF
-convert_dwg_to_dxf(folder_path, output_folder)
+convert_dwg_to_dxf(input_folder, output_folder)
 
 # Find DXF files in the output folder
 dxf_files = find_dxf_files(output_folder)
 
 # Modify DXF files
-modify_dxf_files(dxf_files, output_folder)
-print_drawings(dxf_files, pdf_folder)
+modify_dxf_files(dxf_files, x1, y1, x2, y2, x3, y3, rev_no, rev, rev_date, version_control, output_folder)
+print_drawings(dxf_files, pdf_output)
+list_incrementer(output_folder)
