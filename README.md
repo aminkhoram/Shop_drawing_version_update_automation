@@ -3,7 +3,8 @@ In this project we aim to automate the version update / incrementation / date up
 AFC and AS BUILT Package Automation
 
 Please follow the instructions to generate the AFC and AS BUILT Packages automatically and in a short time, rather than manually editing each drawing.
-1.Clone the program onto your system
+
+**1.Clone the program onto your system**:
 The first step is to clone the program onto your system using the SSH key or HTTPS patch:
 SSH:
 git@support.safetypower.ca:engineering/shop_drawing_version_control.git
@@ -22,14 +23,14 @@ HTTPS:
 •	git clone https://support.safetypower.ca/engineering/shop_drawing_version_control.git
 
 
-2.	Download and Install the ODA file converter
-The first step is to download and install the ODA file converter on your system. In order to convert the DWG files to editable DXF files.
+**2.	Download and Install the ODA file converter**:
+In order to convert the DWG files to editable DXF files.
  ![image](https://github.com/user-attachments/assets/1b381d33-2f4d-4af0-b14c-c394d52657a8)
 ![image](https://github.com/user-attachments/assets/b436328d-15e7-4f20-a191-a5621a78d983)
 ![image](https://github.com/user-attachments/assets/7906433a-84f0-4d29-9aa4-f86c2334e978)
 
  
-3.	Add a virtual environment and install all the required packages
+**3.	Add a virtual environment and install all the required packages:**
 To make a virtual environment in your project directory, you need to follow the following steps:
 -change the path to your project folder: 
   cd path/to/your/project
@@ -38,13 +39,13 @@ To make a virtual environment in your project directory, you need to follow the 
 -Activate your virtual environment using the following command
   myenv\Scripts\activate
 
-Now you need to install the following packages using the following command:
+Now you need to install the following packages (Python version: 3.12) using the following command:
   pip install (package name/library)
 The following packages need to be installed:
  (os, ezdxf, re, datetime, shutil, subprocess, matplotlib)
  ![image](https://github.com/user-attachments/assets/e79b154e-80e0-43e3-ad5e-75e2166939a3)
 
-4.	Add the input and output folders directory to the code
+**4.	Add the input and output folders directory to the code:**
 You need to add the input, output and pdf folders directory to your code. Please follow these steps:
 -Go to the project folder>02 Shop Drawing Package>_Working> (project version: ex. 24153_Shop drawing package_Rev4A)
 -Make the following folders (output folders) in the working project directory: dwg2, pdf2
@@ -54,7 +55,7 @@ r"\\192.168.2.11\SharedDocs\1. SPI Documents\projects\24153 - MSA2AZ1\02 Shop Dr
 Please note that your input folder is the dwg folder in your project directory, output folder is the dwg2 you created and the pdf2 is where the printed files are saved.
  ![image](https://github.com/user-attachments/assets/4c2af9ff-a3e6-4d38-b27a-49f83c857a7e)
 
-5.	Run the program
+**5.	Run the program:**
 In the next step you can run the program.
 And answer the questions in the terminal
  ![image](https://github.com/user-attachments/assets/523006d1-298e-45eb-8a18-bf2c7483dd33)
@@ -65,7 +66,14 @@ When you opened the drawing package, type “id” using this command you can lo
  ![image](https://github.com/user-attachments/assets/4e4031a5-adae-4db8-b63b-35c418662a6f)
 
 
-In the next step the program asks about the Rev you need to apply:
+**6. In the next step the program asks about the Rev no. you need to apply:**
+
+For instance if you are making an AS BUILT package and changing the rev no. from 2 to 3, add 3.
+
+**7. Finally you need to choose between the following three options:**
+
 Add “1” if you need to rev up from “FOR CUTOMER APPROVAL” to “APPROVED FOR CONSTRUCTION”
+
 Add “2” if you need to rev up from “APPROVED FOR CONSTRUCTION” to “AS BUILT”
+
 Add “3” if you need to rev up from “FOR CUTOMER APPROVAL” to “AS BUILT”
